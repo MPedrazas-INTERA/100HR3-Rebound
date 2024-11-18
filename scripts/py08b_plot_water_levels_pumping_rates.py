@@ -201,6 +201,10 @@ def import_pumping_data():
 
     individual_plots = True
     sdate = '2019-01-01'
+    fs = 10
+    plt.rc('xtick', labelsize=fs)
+    plt.rc('ytick', labelsize=fs)
+
     if individual_plots:
         df = pumping_data.iloc[:,:-3].transpose()  ## clip to timeseries data and transpose
         df.columns = df.iloc[0]
@@ -211,20 +215,80 @@ def import_pumping_data():
 
         for well in df.columns[1:]:
             print(well)
-            toplot = df[well]
+            toplot = df[well] #m3/day
+            gpm2m3d = (24 * 60) / 1 * 231 * (25.4 / 1000 / 1) ** 3  ## m3d2gpm=0.183453
+            toplot_gpm = toplot / gpm2m3d
             fig, ax = plt.subplots(figsize=(9, 4))
-            ax.plot(df.Date, abs(toplot))
-            if "_I_" in well:
-                plt.title(f"Injection Rate in {well}")
-            elif "_E_" in well:
-                plt.title(f"Extraction Rate in {well}")
+            ax.plot(pd.to_datetime(df.Date), abs(toplot_gpm), ls = '--', label=f"{well}")
+            ax.scatter(df.Date, abs(toplot_gpm), s=10)
+            # if "_I_" in well:
+            #     plt.title(f"Injection Rate in {well}")
+            # elif "_E_" in well:
+            #     plt.title(f"Extraction Rate in {well}")
+            plt.legend(loc="upper right", fontsize=fs - 2)
             plt.grid()
-            plt.ylabel('Pumping Rate (m3/d)')
+            plt.ylabel('Pumping Rate (GPM)')
             plt.xlim([pd.to_datetime(sdate), max(df.Date)])
             plt.savefig(os.path.join(cwd, 'output', 'pumping_plots', 'individual_wells', f'{well}_pumping_{sdate[:4]}_2023.png'), bbox_inches='tight', dpi=400)
             plt.close()
     else:
         pass
+
+    return None
+
+def plot_pumping_data_bygroup(pmp_grpwells, version="100H"):
+
+    figdir = os.path.join(cwd, 'output', 'pumping_plots', 'grp_wells')
+    if not os.path.isdir(figdir):
+        os.makedirs(figdir)
+
+    pumping_data = pd.read_csv(os.path.join(wdir, 'model_packages', 'hist_2014_Oct2023', 'mnw2',
+                                            'wellratesdxhx_cy2014_oct2023.csv'))
+    times = pd.read_csv(os.path.join(cwd, 'input', 'sp_2014_2023.csv'))
+    cols = ['ID'] + list(times['start_date'])
+    pumping_data.columns = cols
+    pumping_data[['Short', 'Function', 'System']] = pumping_data['ID'].str.split('_', 2, expand=True)
+
+    sdate = '2019-01-01'
+    df = pumping_data.iloc[:,:-3].transpose()  ## clip to timeseries data and transpose
+    df.columns = df.iloc[0]
+    df.reset_index(inplace=True)
+    df.drop(0, inplace=True)
+    df.rename(columns={"index":"Date"}, inplace=True)
+    df.Date = pd.to_datetime(df.Date)
+
+    fs = 10
+    plt.rc('xtick', labelsize=fs)
+    plt.rc('ytick', labelsize=fs)
+    cnt=0
+    for wellgrp in pmp_grpwells:
+        cnt += 1
+        fig, ax = plt.subplots(figsize=(9, 4))
+        for well in wellgrp:
+            print(well)
+            toplot = df[well]  # m3/day
+            toplot_gpm = toplot / gpm2m3d
+            ax.plot(pd.to_datetime(df.Date), abs(toplot_gpm), ls = '--', label=f"{well}")
+            ax.scatter(df.Date, abs(toplot_gpm), s=10)
+        # if "_I_" in well:
+        #     plt.title(f"Injection Rate in {well}", fontsize=fs)
+        # elif "_E_" in well:
+        #     plt.title(f"Extraction Rate in {well}", fontsize=fs)
+        plt.legend(loc="upper right", fontsize=fs - 2)
+        ax.minorticks_on()
+        ax.grid(which='major', linestyle='-',
+                linewidth='0.1', color='k', alpha=0.85)
+        ax.grid(which='minor', linestyle=':',
+                linewidth='0.1', color='k', alpha=0.65)
+        plt.xticks(rotation=45)
+        plt.ylabel('Pumping Rate (GPM)')
+        plt.xlim([pd.to_datetime(sdate), max(df.Date)])
+        if version == "100D":
+            ax.axvline(pd.to_datetime('2023-04-12'), color='gray', linestyle='-', linewidth=1, zorder=1)
+        else: #100H
+            ax.axvline(pd.to_datetime('2022-10-04'), color='gray', linestyle='-', linewidth=1, zorder=1)
+        plt.savefig(os.path.join(figdir, f'grp{cnt}_pumping_{sdate[:4]}_2023.png'), bbox_inches='tight', dpi=400)
+        plt.close()
 
     return None
 
@@ -270,6 +334,7 @@ def generate_plots(df_sp, myHds):
 if __name__ == "__main__":
 
     cwd = os.getcwd()
+    gpm2m3d = (24 * 60) / 1 * 231 * (25.4 / 1000 / 1) ** 3  ## m3d2gpm=0.183453
     # df, df_sp, df_sp_m = import_WL_data() ## run once at beginning of workflow
     # df_sp.to_csv(os.path.join(cwd, 'output', 'water_level_data', 'obs_2021_2023', 'measured_WLs_daily.csv'))
 
@@ -284,7 +349,12 @@ if __name__ == "__main__":
     # hds_file = os.path.join(os.path.dirname(cwd), 'mruns', f'{sce}', f'flow_{sce[-9:]}', '100hr3.hds')
     # myHds = read_head(hds_file, monitoring_wells)
 
-    import_pumping_data() #updated to Oct 2023
+    # import_pumping_data() #updated to Oct 2023
+
+    pmp_grpwells = [["199-H3-25_E_HX","199-H3-26_E_HX","199-H4-86_E_HX","199-H4-4_E_HX",],
+                    ["199-H3-27_I_HX","199-H4-17_I_HX",],
+                    ["199-H3-22_E_HX","199-H3-29_E_HX",]]
+    plot_pumping_data_bygroup(pmp_grpwells, version="100H")
 
     # generate_plots(df_sp, myHds)
 

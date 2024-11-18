@@ -859,7 +859,11 @@ if __name__ == "__main__":
     ### Observed CONC for 2014 to Oct 2023
     crvi_meas_2023 = pd.read_csv(os.path.join(chemdir, '2014to2023', '100D', 'Cr_obs_2014_2023_100D_mp.csv'), index_col = 'DATE', parse_dates = True)
     crvi_meas_2024 = pd.read_csv(os.path.join(chemdir, '2023to2024', '100D', 'Cr_obs_100D.csv'), index_col = 'DATE', parse_dates=True)
-    crvi_meas_2024 = crvi_meas_2024.loc[crvi_meas_2024.index > max(crvi_meas_2023.index)]
+    crvi_meas_2024 = crvi_meas_2024.loc[crvi_meas_2024.index > pd.to_datetime(crvi_meas_2023.index.max())]
+    ### I can't do the following because the dates matter, not only the months. So better to keep intact the 2023 dataset, and add the new 2024 obs.
+    ### HP found minor differences when comparing the overlap.
+    # crvi_meas_2024 = crvi_meas_2024.loc[crvi_meas_2024.index > pd.to_datetime("04/30/2023")]
+    # crvi_meas_2023 = crvi_meas_2023.loc[crvi_meas_2023.index <= pd.to_datetime("04/30/2023")]
     crvi_meas_2024.rename(columns={"VAL": "STD_VALUE_RPTD"}, inplace=True)
     crvi_meas_ALL = pd.concat([crvi_meas_2023, crvi_meas_2024])
     crvi_meas_ALL.sort_index(inplace=True)
